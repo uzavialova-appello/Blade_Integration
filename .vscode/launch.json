@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "type": "al",
+            "request": "launch",
+            "name": "Microsoft cloud sandbox",
+            //"name": "Sandbox",
+            //"server": "https://businesscentral.dynamics.com/Prod_Copy1611",
+            "startupObjectId": 30,
+            "startupObjectType": "Page",
+            //"environmentName": "Production",
+            "environmentName": "Sandbox",
+            "environmentType": "Sandbox",
+            //"environmentType": "Production",
+            //"environmentName": "Prod_Copy2701",
+            "breakOnError": true,
+            "launchBrowser": true,
+            "breakOnRecordWrite": false,
+            "enableLongRunningSqlStatements": true,
+            "enableSqlInformationDebugger": true,
+            //"schemaUpdateMode": "Recreate"
+        }
+    ]
+}

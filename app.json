@@ -1,0 +1,44 @@
+{
+  "id": "be19cb1f-0681-495d-ba3f-74364d2faad5",
+  "name": "Blade_Integration",
+  "publisher": "Appello",
+  "version": "18.0.0.17",
+  "brief": "",
+  "description": "Blade Integration",
+  "privacyStatement": "",
+  "EULA": "",
+  "help": "",
+  "url": "",
+  "logo": "",
+  "dependencies": [
+    {
+      "id": "63ca2fa4-4f03-4f2b-a480-172fef340d3f",
+      "publisher": "Microsoft",
+      "name": "System Application",
+      "version": "18.0.0.0"
+    },
+    {
+      "id": "437dbf0e-84ff-417a-965d-ed2bb9650972",
+      "publisher": "Microsoft",
+      "name": "Base Application",
+      "version": "18.0.0.0"
+    },
+    {
+      "id": "acf973d4-9e93-44f1-8d42-8de72a59ff59",
+      "publisher": "SIS Global",
+      "name": "Appello_Fields",
+      "version": "1.0.0.22"
+    }
+  ],
+  "screenshots": [],
+  "platform": "18.0.0.0",
+  "idRanges": [
+    {
+      "from": 65000,
+      "to": 65500
+    }
+  ],
+  "contextSensitiveHelpUrl": "https://Blade_Integration.com/help/",
+  "showMyCode": true,
+  "runtime": "5.0"
+}
