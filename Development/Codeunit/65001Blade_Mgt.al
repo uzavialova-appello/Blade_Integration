@@ -3396,7 +3396,7 @@ codeunit 65001 "Blade Mgt."
         Text006: Label 'The corrections cannot be saved as excess quantity has been defined.\Close the form anyway?';
     //WhseShipmentLine: Record "Warehouse Shipment Line";
     begin
-        Authentication();
+        /*Authentication();
         lurl := InventorySetup."Blade Base Url" + '/orders/goodsouts/' + pWhseShipmentHeader."Blade ID" + '/despatch_attributes'; //check
         gheaders := Client.DefaultRequestHeaders();
         gheaders.Remove('Accept');
@@ -3468,7 +3468,7 @@ codeunit 65001 "Blade Mgt."
         if TextJsonObject.Get('error', JsonToken) then begin
             ErrorMsg := SelectJsonToken(TextJsonObject, '$.error.message').AsValue().AsText();
             Error(ErrorMsg);
-        end;
+        end;*/
 
         //Clear(TextJsonObject);
         //pWhseShipmentHeader.TestField("Reason Code");
@@ -3770,11 +3770,11 @@ codeunit 65001 "Blade Mgt."
         CompanyInfo: Record "Company Information";
     begin
         CompanyInfo.get();
-        TrackingSpecification.Reset();
-        TrackingSpecification.SetRange(TrackingSpecification."Entry No.", 686);
-        TrackingSpecification.SetFilter(TrackingSpecification."Source ID", '%1', 'WS000000006');
-        if TrackingSpecification.FindFirst() then
-            TrackingSpecification.Delete();
+        //TrackingSpecification.Reset();
+        //TrackingSpecification.SetRange(TrackingSpecification."Entry No.", 686);
+        //TrackingSpecification.SetFilter(TrackingSpecification."Source ID", '%1', 'WS000000006');
+        //if TrackingSpecification.FindFirst() then
+        //TrackingSpecification.Delete();
         TrackingSpecification.Reset();
         TrackingSpecification.init();
         TrackingSpecification."Entry No." := GetLastEntryNo1();
