@@ -30,4 +30,10 @@ tableextension 65011 "Warehouse Shipment Line Blade" extends "Warehouse Shipment
             MinValue = 0;
         }
     }
+    keys
+    {
+        key(Key13; "Blade Sku", "Sent to Blade")
+        {
+        }
+    }
 }

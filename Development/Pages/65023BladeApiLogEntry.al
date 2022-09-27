@@ -41,7 +41,7 @@ page 65023 "Blade Api Log Entries"
             }
         }
     }
-    
+
     trigger OnAfterGetRecord()
     begin
         RequestBody := GetAPIReqDescription();
@@ -81,7 +81,7 @@ page 65023 "Blade Api Log Entries"
         IF NOT "API Response Body".HASVALUE THEN
             EXIT('');
 
-        "API Request Body".CreateInStream(inStream);
+        "API Response Body".CreateInStream(inStream);
         inStream.ReadText(result);
         EXIT(result);
     end;

@@ -53,19 +53,9 @@ pageextension 65039 "Sales Order Blade" extends "Sales Order"
                     GetSourceDocOutbound: Codeunit "Get Source Doc. Outbound";
                     SalesHeader: Record "Sales Header";
                 begin
-                    //SalesHeader.get(rec."Document Type", Rec."No.");
-                    //Rec."Whse. Backorder" := true;
-                    //SalesHeader."Whse. Backorder" := true;
-                    //salesModify();
                     Rec."Whse. Backorder" := true;
                     CurrPage.Update(true);
                     GetSourceDocOutbound.CreateFromSalesOrder(Rec);
-                    //GetSourceDocOutbound.CreateFromSalesOrder(SalesHeader);
-                    // if not Find('=><') then
-                    //     Init;
-                    //Rec."Whse. Backorder" := false;
-                    //Clear(SalesHeader."Whse. Backorder");
-                    //SalesHeader.Modify();
                     Rec."Whse. Backorder" := false;
                     Rec.Modify(false);
                     CurrPage.Update(true);

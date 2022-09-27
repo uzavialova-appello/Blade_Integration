@@ -34,7 +34,6 @@ pageextension 65027 "Whse Shipment Subform Blade" extends "Whse. Shipment Subfor
                 ApplicationArea = all;
                 Editable = AllowEditBladeFields;
             }
-
         }
     }
 
@@ -74,17 +73,17 @@ pageextension 65027 "Whse Shipment Subform Blade" extends "Whse. Shipment Subfor
                         BladeMgt.CancelWhseShipmentOrderLine(WhseShipmentHeader, WhseShipmentLine);
                     end;
                 }
-                action("Update Dummy Serial No.")
-                {
-                    ApplicationArea = All;
-                    Visible = AllowEditBladeFields;
+                // action("Update Dummy Serial No.")
+                // {
+                //     ApplicationArea = All;
+                //     Visible = AllowEditBladeFields;
 
-                    trigger OnAction()
-                    begin
-                        WhseShipmentHeader.Get(Rec."No.");
-                        //BladeMgt.InsertSerialNos(Rec."Item No.", WhseShipmentHeader, Rec);
-                    end;
-                }
+                //     trigger OnAction()
+                //     begin
+                //         WhseShipmentHeader.Get(Rec."No.");
+                //         //BladeMgt.InsertSerialNos(Rec."Item No.", WhseShipmentHeader, Rec);
+                //     end;
+                // }
                 // action("Update Shipment Line Quantity")
                 // {
                 //     ApplicationArea = All;

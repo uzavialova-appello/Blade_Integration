@@ -72,6 +72,21 @@ pageextension 65033 "Job Planning Lines Blade" extends "Job Planning Lines"
                 Editable = false;
             }
         }
+        addafter(Quantity)
+        {
+            field("Return Reason"; "Return Reason")
+            {
+                ApplicationArea = all;
+            }
+            field("Return Status"; "Return Status")
+            {
+                ApplicationArea = all;
+            }
+            field("Return Id"; "Return Id")
+            {
+                ApplicationArea = all;
+            }
+        }
     }
     actions
     {
@@ -93,16 +108,19 @@ pageextension 65033 "Job Planning Lines Blade" extends "Job Planning Lines"
                         OldJobPlanningLine: Record "Job Planning Line";
                         JobEntryNoFilter: Text;
                         NothingToSendErr: Label 'There is nothing to sent to Blade. Please mark the planning lines you want to send.';
+                        CopyJobPlanningLine: Record "Job Planning Line";
                     begin
                         Job.Get(Rec."Job No.");
-                        JobPlanningLine.Reset();
-                        JobPlanningLine.SetRange("Job No.", Rec."Job No.");
-                        JobPlanningLine.SetRange("To Be Sent To Blade", true);
+                        // JobPlanningLine.Reset();
+                        // JobPlanningLine.SetRange("Job No.", Rec."Job No.");
+                        // JobPlanningLine.SetRange("To Be Sent To Blade", true);
+                        BladeMgt.SetJobPlanningLineFiltersForMarkedToBeSent(JobPlanningLine, Job);
                         if not JobPlanningLine.FindSet() then Error(NothingToSendErr);
-                        BladeMgt.GetAvailableQtyJob(Job);
-                        BladeMgt.CheckItemAvailabilityJob(JobPlanningLine);
-                        OldJobPlanningLine.Copy(JobPlanningLine);
-                        BladeMgt.SendAvailableJobPlanningLines(JobPlanningLine);
+                        CopyJobPlanningLine.Copy(JobPlanningLine);
+                        BladeMgt.GetAvailableQtyJob(JobPlanningLine, Job);
+                        BladeMgt.CheckItemAvailabilityJob(CopyJobPlanningLine);
+                        OldJobPlanningLine.Copy(CopyJobPlanningLine);
+                        BladeMgt.SendAvailableJobPlanningLines(CopyJobPlanningLine);
                         BladeMgt.SendNonAvailableJobPlanningLines(OldJobPlanningLine);
                     end;
                 }
@@ -171,17 +189,18 @@ pageextension 65033 "Job Planning Lines Blade" extends "Job Planning Lines"
                     var
                         DuplicateErr: Label 'The job Planning Line has already been sent to Blade under Reference No. %1';
                         Job: Record Job;
+                        JobPlanningLine: Record "Job Planning Line";
                         NotEnoughAvailableQtyConfirm: Label 'There is not enough available qty. for the Item No.%1.Do you want to proceed?';
                         ProcessCancelledErr: Label 'The process has been cancelled.';
-                    //JobPlanningLine:Record "Job Planning Line";
+                        CopyJobPlanningLine: Record "Job Planning Line";
                     begin
-                        if "Line Sent to Blade" then Error(DuplicateErr, Rec."Blade Reference");
+                        JobPlanningLine.Get(Rec."Job No.", rec."Job Task No.", Rec."Line No.");
+                        if JobPlanningLine."Line Sent to Blade" then
+                            Error(DuplicateErr, JobPlanningLine."Blade Reference");
                         Job.Get(Rec."Job No.");
-                        BladeMgt.GetAvailableQtyJob(Job);
-                        Commit();
-                        CurrPage.Update(true);
-                        if "Available Qty." < "Qty. to Send to Blade" then if not Confirm(NotEnoughAvailableQtyConfirm, false, "No.") then Error(ProcessCancelledErr);
-                        BladeMgt.AddNewJobLine(Rec);
+                        BladeMgt.AppendJobPlanningLineToJobOrder(JobPlanningLine, Job);
+                        //CurrPage.SaveRecord();
+                        //CurrPage.Update(true);
                     end;
                 }
                 action("Update Job Planning Line Quantity")
@@ -209,9 +228,13 @@ pageextension 65033 "Job Planning Lines Blade" extends "Job Planning Lines"
                     trigger OnAction()
                     var
                         Job: Record Job;
+                        JobPlanningLine: Record "Job Planning Line";
+                        BladeMgt: Codeunit "Blade Mgt.";
+
                     begin
                         Job.Get(Rec."Job No.");
-                        BladeMgt.GetAvailableQtyJob(Job);
+                        BladeMgt.SetJobPlanningLineFiltersForMarkedToBeSent(JobPlanningLine, Job);
+                        BladeMgt.GetAvailableQtyJob(JobPlanningLine, Job);
                     end;
                 }
                 action("Mark All Job Planning Lines")
@@ -246,6 +269,17 @@ pageextension 65033 "Job Planning Lines Blade" extends "Job Planning Lines"
                         end;
                         Message('Number of records marked is %1. Please review the quantities before sending them to Blade.', counter);
                     end;
+                }
+                //despatch attributes
+                action("Get Despatch Attributes")
+                {
+                    ApplicationArea = All;
+
+                    // trigger OnAction()
+                    // begin
+                    //     WhseShipmentHeader.Get(Rec."No.");
+                    //     BladeMgt.GetDespatchAttributes(WhseShipmentHeader);
+                    // end;
                 }
             }
         }

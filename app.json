@@ -2,7 +2,7 @@
   "id": "be19cb1f-0681-495d-ba3f-74364d2faad5",
   "name": "Blade_Integration",
   "publisher": "Appello",
-  "version": "18.0.0.17",
+  "version": "20.0.0.6",
   "brief": "",
   "description": "Blade Integration",
   "privacyStatement": "",
@@ -27,7 +27,7 @@
       "id": "acf973d4-9e93-44f1-8d42-8de72a59ff59",
       "publisher": "SIS Global",
       "name": "Appello_Fields",
-      "version": "1.0.0.22"
+      "version": "20.0.0.4"
     }
   ],
   "screenshots": [],

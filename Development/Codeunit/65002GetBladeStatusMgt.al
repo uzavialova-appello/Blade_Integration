@@ -21,8 +21,8 @@ codeunit 65002 "Get Blade Statuses"
     begin
         JobPlanningLine.Reset();
         BladeMgt.SetJobPlanningLineFiltersUpdateStatus(JobPlanningLine);
-        JobPlanningLine.SetFilter(JobPlanningLine."Blade Status", '<>%1', JobPlanningLine."Blade Status"::despatched);
-        //Message('%1 records found', JobPlanningLine.Count);
+        //JobPlanningLine.SetFilter(JobPlanningLine."Blade Status", '<>%1', JobPlanningLine."Blade Status"::despatched);
+        JobPlanningLine.SetFilter(JobPlanningLine."Remaining Qty.", '<>%1', 0);
         if not JobPlanningLine.FindSet() then
             exit;
 

@@ -83,16 +83,16 @@ pageextension 65024 "Warehouse Shipment Order Blade" extends "Warehouse Shipment
                         BladeMgt.UpdateShippingAddress(WhseShipmentHeader);
                     end;
                 }
-                action("Get Despatch Attributes")
-                {
-                    ApplicationArea = All;
+                // action("Get Despatch Attributes")
+                // {
+                //     ApplicationArea = All;
 
-                    trigger OnAction()
-                    begin
-                        WhseShipmentHeader.Get(Rec."No.");
-                        BladeMgt.GetDespatchAttributes(WhseShipmentHeader);
-                    end;
-                }
+                //     trigger OnAction()
+                //     begin
+                //         WhseShipmentHeader.Get(Rec."No.");
+                //         BladeMgt.GetDespatchAttributes(WhseShipmentHeader);
+                //     end;
+                // }//temp removed 
             }
         }
     }

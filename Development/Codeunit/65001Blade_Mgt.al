@@ -825,6 +825,7 @@ codeunit 65001 "Blade Mgt."
         SalesHeader.TestField("Ship-to City");
         SalesHeader.TestField("Ship-to Post Code");
         SalesHeader.TestField("Delivery Instructions");
+        SalesHeader.TestField("Sell-to E-Mail");
         TextJsonObject.Add('warehouse', 'CHR');
         TextJsonObject.Add('order', '');
         TextJsonObjectOrder.Add('channel', InventorySetup."Blade Order Channel ID ");
@@ -845,7 +846,7 @@ codeunit 65001 "Blade Mgt."
         TextJsonObjectShippingAddress.Add('country_id', CountryCode);
         textJsonObjectShippingAddress.Add('county', SalesHeader."Ship-to County");
         TextJsonObjectShippingAddress.Add('postcode', SalesHeader."Ship-to Post Code");
-        if SalesHeader."Sell-to E-Mail" <> '' then TextJsonObjectShippingAddress.Add('telephone', SalesHeader."Sell-to E-Mail");
+        if SalesHeader."Sell-to E-Mail" <> '' then TextJsonObjectShippingAddress.Add('email', SalesHeader."Sell-to E-Mail");
         TextJsonObject.Replace('shipping_address', TextJsonObjectShippingAddress);
         TextJsonObject.Add('lines', '');
         WhseShipmentLine.Reset();
@@ -1010,12 +1011,11 @@ codeunit 65001 "Blade Mgt."
         BladeReference := GetNextBladeReferenceJob(OldJobPlanningLine);
         //if Job.Get(OldJobPlanningLine."Job No.") then begin
         if not Job.Get(OldJobPlanningLine."Job No.") then;
-        if Job."Ship-to Code" <> '' then begin
-            ShipToAddress.Get(Job."Sell-to Customer No.", Job."Ship-to Code");
+        if Job."Ship-to Code 1" <> '' then begin
+            ShipToAddress.Get(Job."Sell-to Customer No. 1", Job."Ship-to Code 1");
             ShipToAddress.TestField(City);
             ShipToAddress.TestField("Post Code");
-        end
-        else
+        end else
             Error(ShiptoCodeErr);
         //end;
         //Job.TestField(Job."Ship-to City");
@@ -1041,22 +1041,7 @@ codeunit 65001 "Blade Mgt."
         TextJsonObjectShippingAddress.Add('country_id', CountryCode);
         TextJsonObjectShippingAddress.Add('county', ShipToAddress.County);
         TextJsonObjectShippingAddress.Add('postcode', ShipToAddress."Post Code");
-        //if ShipToAddress."Phone No." <> '' then
         TextJsonObjectShippingAddress.Add('telephone', ShipToAddress."Phone No.");
-        // TextJsonObjectShippingAddress.Add('first_name', Job."Ship-to Name");
-        // TextJsonObjectShippingAddress.Add('last_name', Job."Ship-to Name");
-        // TextJsonObjectShippingAddress.Add('address_one', job."Ship-to Address");
-        // TextJsonObjectShippingAddress.Add('address_two', Job."Ship-to Address 2");
-        // TextJsonObjectShippingAddress.Add('town', Job."Ship-to City");
-        // if (Job."Ship-to Country Code" <> '') then
-        //     CountryCode := Job."Ship-to Country Code"
-        // else
-        //     CountryCode := 'GB';
-        //TextJsonObjectShippingAddress.Add('country_id', CountryCode);
-        //textJsonObjectShippingAddress.Add('county', Job."Ship-to County");
-        //TextJsonObjectShippingAddress.Add('postcode', Job."Ship-to Post Code");
-        //if Job."Ship-to Phone No." <> '' then
-        //TextJsonObjectShippingAddress.Add('telephone', Job."Ship-to Phone No.");
         TextJsonObject.Replace('shipping_address', TextJsonObjectShippingAddress);
         TextJsonObject.Add('lines', '');
         TextJsonObjectLines.Add('variation', '');
@@ -1456,8 +1441,8 @@ codeunit 65001 "Blade Mgt."
         lurl := InventorySetup."Blade Base Url" + '/orders/goodsouts/' + pJobPlanningLine."Blade ID" + '/shipping_address';
         Clear(TextJsonObject);
         if not Job.Get(pJobPlanningLine."Job No.") then;
-        if (Job."Ship-to Code" <> '') then begin
-            ShipToAddress.Get(Job."Sell-to Customer No.", Job."Ship-to Code");
+        if (Job."Ship-to Code 1" <> '') then begin
+            ShipToAddress.Get(Job."Sell-to Customer No. 1", Job."Ship-to Code 1");
             ShipToAddress.TestField(City);
             ShipToAddress.TestField("Post Code");
         end
@@ -1557,12 +1542,12 @@ codeunit 65001 "Blade Mgt."
         end
         else
             Error(BladeReferenceErr);
-        //Commit();//temp
         JobPLanningLine.Reset();
-        JobPLanningLine.SetCurrentKey("Blade ID"); //check this 1803
+        JobPLanningLine.SetCurrentKey("Blade ID");
         JobPLanningLine.SetRange("Blade ID", JobBladeId);
         if JobPLanningLine.FindFirst() then GetJobPlanningLineStatuses(JobPLanningLine, true);
-        Authentication();
+        if CurrentDateTime > ExpiryDateTime then
+            Authentication();
         lurl := InventorySetup."Blade Base Url" + '/orders/goodsouts/' + JobBladeId + '/lines';
         Clear(TextJsonObject);
         Clear(TextJsonObjectVariation);
@@ -1591,9 +1576,9 @@ codeunit 65001 "Blade Mgt."
         gheaders.Add('Access-Token', sessiontoken);
         if client.Post(lurl, gcontent, gResponseMsg) then begin
             gResponseMsg.Content.ReadAs(lresptext);
+            JsonToken.ReadFrom(lresptext);
             ModifyLogwithResponse(lresptext, EntryNo);
             Clear(TextJsonObject);
-            JsonToken.ReadFrom(lresptext);
             TextJsonObject := JsonToken.AsObject();
             if TextJsonObject.Get('data', JsonToken) then begin
                 BladeLineId := SelectJsonToken(TextJsonObject, '$.data.id').AsValue().AsCode();
@@ -1607,21 +1592,33 @@ codeunit 65001 "Blade Mgt."
                 pJobPlanningLine.Validate("Line Sent to Blade", true);
                 pJobPlanningLine.Validate("Blade Sku", BladeSku);
                 pJobPlanningLine.Validate("Blade Reference", JobBladeReference);
-                //ValidateBladeJobLineStatus(BladeStatus, pJobPlanningLine);
-                ValidateBladeJobLineStatus(format(JobPLanningLine."Blade Status"), pJobPlanningLine);
+                pJobPlanningLine.Validate("Blade Status", JobPLanningLine."Blade Status");
                 Clear(pJobPlanningLine."Qty. to Send to Blade");
                 Clear(pJobPlanningLine."To Be Sent To Blade");
                 Clear(pJobPlanningLine."Blade Cancel Reason");
                 if BladeLineStatus = 'active' then pJobPlanningLine.Validate(pJobPlanningLine."Blade Line Status", pJobPlanningLine."Blade Line Status"::active);
                 if BladeLineStatus = 'void' then pJobPlanningLine.Validate(pJobPlanningLine."Blade Line Status", pJobPlanningLine."Blade Line Status"::void);
                 if pJobPlanningLine.Modify() then Message('The Job Planning Line has been successfully added.');
-                //Commit();
             end;
             if TextJsonObject.Get('error', JsonToken) then begin
                 ErrorMsg := SelectJsonToken(TextJsonObject, '$.error.message').AsValue().AsText();
                 Error(ErrorMsg);
             end;
         end;
+    end;
+
+    procedure AppendJobPlanningLineToJobOrder(var pJobPlanningLine: Record "Job Planning Line"; pJob: Record Job)
+    var
+        NotEnoughAvailableQtyConfirm: Label 'There is not enough available qty. for the Item No.%1.Do you want to proceed?';
+        ProcessCancelledErr: Label 'The process has been cancelled.';
+        JobPlanningLine: Record "Job Planning Line";
+    begin
+        SetJobPlanningLineFiltersForMarkedToBeSent(pJobPlanningLine, pJob);
+        GetAvailableQtyJob(pJobPlanningLine, pJob);
+        if pJobPlanningLine."Available Qty." < pJobPlanningLine."Qty. to Send to Blade" then
+            if not Confirm(NotEnoughAvailableQtyConfirm, false, pJobPlanningLine."No.") then
+                Error(ProcessCancelledErr);
+        AddNewJobLine(pJobPlanningLine);
     end;
 
     procedure GetOrderChannelList()
@@ -2188,7 +2185,7 @@ codeunit 65001 "Blade Mgt."
                         if WarehouseReceiptLine.FindSet() then begin
                             repeat
                                 ValidateBladeWhseReceiptOrderLineStatus(BladeLineStatus, WarehouseReceiptLine);
-                                Clear(WarehouseReceiptLine."Qty. to Receive");//2904
+                                Clear(WarehouseReceiptLine."Qty. to Receive"); //2904
                                 WarehouseReceiptLine.Modify();
                             until WarehouseReceiptLine.Next() = 0;
                         end;
@@ -2205,17 +2202,16 @@ codeunit 65001 "Blade Mgt."
                                     Evaluate(decBladeQtyReceived, BladeQtyReceived);
                                     Clear(BladeOverReceiptQty);
                                     //2304 start
-
                                     TempWarehouseReceiptLineBuffer.Init();
                                     TempWarehouseReceiptLineBuffer.SetCurrentKey("Item No.");
                                     TempWarehouseReceiptLineBuffer.SetRange("Item No.", BladeSku);
                                     EntryInBufferExists := TempWarehouseReceiptLineBuffer.FindFirst();
                                     if not EntryInBufferExists then begin
                                         TempWarehouseReceiptLineBuffer."No." := pWarehouseReceiptHeader."No.";
-                                        TempWarehouseReceiptLineBuffer."Line No." := LineNo + 10000;//was prev
-                                        //TempWarehouseReceiptLineBuffer."Item No." := BladeSku;
-                                        //TempWarehouseReceiptLineBuffer."Qty. to Receive" := decBladeQtyReceived;
-                                    end;//uz   
+                                        TempWarehouseReceiptLineBuffer."Line No." := LineNo + 10000; //was prev
+                                                                                                     //TempWarehouseReceiptLineBuffer."Item No." := BladeSku;
+                                                                                                     //TempWarehouseReceiptLineBuffer."Qty. to Receive" := decBladeQtyReceived;
+                                    end; //uz   
                                     TempWarehouseReceiptLineBuffer."Item No." := BladeSku;
                                     TempWarehouseReceiptLineBuffer."Qty. to Receive" += decBladeQtyReceived;
                                     //LineNo := TempWarehouseReceiptLineBuffer."Line No.";//test here was prev
@@ -2225,7 +2221,6 @@ codeunit 65001 "Blade Mgt."
                                         TempWarehouseReceiptLineBuffer.Modify()
                                     else
                                         TempWarehouseReceiptLineBuffer.Insert();
-
                                     //2304 end
                                     //Clear(TotaldecBladeQtyReceived);
                                     // WarehouseReceiptLine.Reset();
@@ -2238,7 +2233,6 @@ codeunit 65001 "Blade Mgt."
                                     //     //if (decBladeQtyReceived > WarehouseReceiptLine."Qty. Sent to Blade") the n begin
                                     //     if (TotaldecBladeQtyReceived > WarehouseReceiptLine."Qty. Sent to Blade") then begin
                                     //         //WarehouseReceiptLine."Qty. to Receive") then begin 
-
                                     //         BladeOverReceiptQty := decBladeQtyReceived - WarehouseReceiptLine."Qty. to Receive";
                                     //         WarehouseReceiptLine.Validate("Over-Receipt Quantity", BladeOverReceiptQty);
                                     //     end;
@@ -2258,7 +2252,7 @@ codeunit 65001 "Blade Mgt."
                         if TempWarehouseReceiptLineBuffer.FindFirst() then begin
                             repeat
                                 WarehouseReceiptLine.Reset();
-                                WarehouseReceiptLine.SetCurrentKey("Blade Sku");//0605
+                                WarehouseReceiptLine.SetCurrentKey("Blade Sku"); //0605
                                 WarehouseReceiptLine.SetRange(WarehouseReceiptLine."No.", pWarehouseReceiptHeader."No.");
                                 //WarehouseReceiptLine.SetRange(WarehouseReceiptLine."Qty. Received", 0);
                                 //WarehouseReceiptLine.SetRange(WarehouseReceiptLine."Item No.", TempWarehouseReceiptLineBuffer."Item No.");
@@ -2269,8 +2263,7 @@ codeunit 65001 "Blade Mgt."
                                     //if (decBladeQtyReceived > WarehouseReceiptLine."Qty. Sent to Blade") the n begin
                                     if (TempWarehouseReceiptLineBuffer."Qty. to Receive" > WarehouseReceiptLine."Qty. Sent to Blade") then begin
                                         //WarehouseReceiptLine."Qty. to Receive") then begin 
-
-                                        BladeOverReceiptQty := TempWarehouseReceiptLineBuffer."Qty. to Receive" - WarehouseReceiptLine."Qty. Sent to Blade";//decBladeQtyReceived - WarehouseReceiptLine."Qty. to Receive";
+                                        BladeOverReceiptQty := TempWarehouseReceiptLineBuffer."Qty. to Receive" - WarehouseReceiptLine."Qty. Sent to Blade"; //decBladeQtyReceived - WarehouseReceiptLine."Qty. to Receive";
                                         WarehouseReceiptLine.Validate("Over-Receipt Quantity", BladeOverReceiptQty);
                                     end;
                                     // if decBladeQtyReceived < WarehouseReceiptLine."Qty. to Receive" then begin
@@ -2294,6 +2287,210 @@ codeunit 65001 "Blade Mgt."
             Error(ErrorMsg);
         end;
     end;
+
+    // procedure SynchWarehouseReceiptStatus(var pWarehouseReceiptHeader: Record "Warehouse Receipt Header")
+    // var
+    //     lurl: Text;
+    //     gheaders: HttpHeaders;
+    //     requestMsg: HttpRequestMessage;
+    //     responseMsg: HttpResponseMessage;
+    //     lresptext: Text;
+    //     TextJsonArray: JsonArray;
+    //     ItemsJsonArray: JsonArray;
+    //     i: Integer;
+    //     j: Integer;
+    //     JsonToken: JsonToken;
+    //     TextJsonObject: JsonObject;
+    //     TextJsonObjectGoodsIn: JsonObject;
+    //     TextJsonItem: JsonObject;
+    //     textJsonArrayOrderReference: JsonArray;
+    //     JsonTokenData: JsonToken;
+    //     JsonTokenReference: JsonToken;
+    //     JsonTokenGoodsIns: JsonToken;
+    //     JsonTokenGoodsIn: JsonToken;
+    //     JsonTokenItems: JsonToken;
+    //     JsonTokenItem: JsonToken;
+    //     BladeSku: Text;
+    //     BladeId: Text;
+    //     JsonTokenStatus: JsonToken;
+    //     JsonTokenChannelId: JsonToken;
+    //     BladeStatus: Text;
+    //     BladeLineStatus: Text;
+    //     ChannelId: Text;
+    //     intChannelId: Integer;
+    //     BladeQtyReceived: Text;
+    //     decBladeQtyReceived: Decimal;
+    //     //TotaldecBladeQtyReceived: Decimal;
+    //     LineNo: Integer;
+    //     WarehouseReceiptLine: Record "Warehouse Receipt Line";
+    //     TempWarehouseReceiptLineBuffer: Record "Warehouse Receipt Line" temporary;
+    //     EntryInBufferExists: Boolean;
+    //     ErrorMsg: text;
+    //     WebserviceFailedErr: Label 'The call to webservice failed.';
+    //     BladeOverReceiptQty: Decimal;
+    //     client: HttpClient;
+    // begin
+    //     if CurrentDateTime > ExpiryDateTime then Authentication();
+    //     //2304
+    //     TempWarehouseReceiptLineBuffer.Reset();
+    //     TempWarehouseReceiptLineBuffer.DeleteAll();
+    //     Clear(LineNo);
+    //     //2304
+    //     lurl := InventorySetup."Blade Base Url" + '/purchase_orders/' + pWarehouseReceiptHeader."Blade ID" + '/?expand=*';
+    //     gheaders := client.DefaultRequestHeaders();
+    //     gheaders.Remove('Accept');
+    //     gheaders.Add('Accept', 'application/json');
+    //     gheaders.Remove('User-Agent');
+    //     gheaders.Add('User-Agent', 'Java/1.7.0_51');
+    //     gheaders.TryAddWithoutValidation('Content-Type', 'application/json');
+    //     gheaders.TryAddWithoutValidation('Access-Token', sessiontoken);
+    //     requestMsg.SetRequestUri(lurl);
+    //     requestMsg.Method := 'GET';
+    //     if not Client.Send(requestMsg, responseMsg) then Error(WebserviceFailedErr);
+    //     responseMsg.Content.ReadAs(lresptext);
+    //     //Message('resp text is %1', lresptext);//temp added
+    //     EntryNo := InsertLog(BladeId, lurl);
+    //     if responseMsg.HttpStatusCode() = 500 then Error(responseMsg.ReasonPhrase());
+    //     if (responseMsg.HttpStatusCode <> 200) then Error(responseMsg.ReasonPhrase());
+    //     Clear(TextJsonObject);
+    //     Clear(TextJsonObjectGoodsIn);
+    //     JsonToken.ReadFrom(lresptext);
+    //     TextJsonObject := JsonToken.AsObject();
+    //     if TextJsonObject.Get('data', JsonToken) then begin
+    //         BladeId := SelectJsonToken(TextJsonObject, '$.data.id').AsValue().AsCode();
+    //         ChannelId := SelectJsonToken(TextJsonObject, '$.data.product_channel_id').AsValue().AsCode();
+    //         BladeStatus := SelectJsonToken(TextJsonObject, '$.data.status').AsValue().AsText();
+    //         BladeId := DelChr(BladeId, '=', '"');
+    //         ChannelId := DelChr(ChannelId, '=', '"');
+    //         BladeStatus := DelChr(BladeStatus, '=', '"');
+    //         Evaluate(intChannelId, ChannelId);
+    //         if (intChannelId = InventorySetup."Blade Organization ID") then begin
+    //             InsertLog(StrSubstNo('Purchase Order No. %1,Blade ID %2', pWarehouseReceiptHeader."No.", BladeId), lurl);
+    //             ValidateBladeWhseReceiptOrderStatus(BladeStatus, pWarehouseReceiptHeader);
+    //             pWarehouseReceiptHeader.Validate(pWarehouseReceiptHeader."Sent to Blade", true); //needed?
+    //             TextJsonObjectGoodsIn := JsonToken.AsObject(); //test
+    //             if TextJsonObjectGoodsIn.Get('goodsins', JsonToken) then begin
+    //                 Clear(TextJsonArray);
+    //                 TextJsonArray := JsonToken.AsArray();
+    //                 TextJsonObjectGoodsIn.WriteTo(lresptext);
+    //                 for i := 0 to TextJsonArray.Count - 1 do begin
+    //                     TextJsonArray.Get(i, JsonTokenGoodsIn);
+    //                     TextJsonObjectGoodsIn := JsonTokenGoodsIn.AsObject();
+    //                     BladeLineStatus := SelectJsonToken(TextJsonObjectGoodsIn, '$.status').AsValue().AsText();
+    //                     BladeLineStatus := DelChr(BladeLineStatus, '=', '"');
+    //                     WarehouseReceiptLine.Reset();
+    //                     WarehouseReceiptLine.SetRange("No.", pWarehouseReceiptHeader."No.");
+    //                     if WarehouseReceiptLine.FindSet() then begin
+    //                         repeat
+    //                             ValidateBladeWhseReceiptOrderLineStatus(BladeLineStatus, WarehouseReceiptLine);
+    //                             Clear(WarehouseReceiptLine."Qty. to Receive");//2904
+    //                             WarehouseReceiptLine.Modify();
+    //                         until WarehouseReceiptLine.Next() = 0;
+    //                     end;
+    //                     if TextJsonObjectGoodsIn.Get('items', JsonTokenItems) then begin
+    //                         ItemsJsonArray := JsonTokenItems.AsArray();
+    //                         for j := 0 to ItemsJsonArray.Count - 1 do begin
+    //                             if ItemsJsonArray.Get(j, JsonTokenItem) then begin
+    //                                 TextJsonItem := JsonTokenItem.AsObject();
+    //                                 //Clear(TotaldecBladeQtyReceived);//test
+    //                                 BladeQtyReceived := SelectJsonToken(TextJsonItem, '$.quantity').AsValue().AsText();
+    //                                 BladeSku := SelectJsonToken(TextJsonItem, '$.component.sku').AsValue().AsText();
+    //                                 BladeQtyReceived := DelChr(BladeQtyReceived, '=', '"');
+    //                                 BladeSku := DelChr(BladeSku, '=', '"');
+    //                                 Evaluate(decBladeQtyReceived, BladeQtyReceived);
+    //                                 Clear(BladeOverReceiptQty);
+    //                                 //2304 start
+
+    //                                 TempWarehouseReceiptLineBuffer.Init();
+    //                                 TempWarehouseReceiptLineBuffer.SetCurrentKey("Item No.");
+    //                                 TempWarehouseReceiptLineBuffer.SetRange("Item No.", BladeSku); //fixed with below 23032021
+    //                                 //TempWarehouseReceiptLineBuffer.SetCurrentKey("Blade Sku"); removed to test
+    //                                 //TempWarehouseReceiptLineBuffer.SetRange("Blade Sku", BladeSku);
+    //                                 EntryInBufferExists := TempWarehouseReceiptLineBuffer.FindFirst();
+    //                                 if not EntryInBufferExists then begin
+    //                                     TempWarehouseReceiptLineBuffer."No." := pWarehouseReceiptHeader."No.";
+    //                                     TempWarehouseReceiptLineBuffer."Line No." := LineNo + 10000;//was prev
+    //                                     //TempWarehouseReceiptLineBuffer."Item No." := BladeSku;
+    //                                     //TempWarehouseReceiptLineBuffer."Qty. to Receive" := decBladeQtyReceived;
+    //                                 end;//uz   
+    //                                 TempWarehouseReceiptLineBuffer."Item No." := BladeSku;
+    //                                 TempWarehouseReceiptLineBuffer."Qty. to Receive" += decBladeQtyReceived;
+    //                                 //LineNo := TempWarehouseReceiptLineBuffer."Line No.";//test here was prev
+    //                                 //TempWarehouseReceiptLineBuffer."Line No." := LineNo + 10000;
+    //                                 LineNo += 10000;
+    //                                 if EntryInBufferExists then
+    //                                     TempWarehouseReceiptLineBuffer.Modify()
+    //                                 else
+    //                                     TempWarehouseReceiptLineBuffer.Insert();
+
+    //                                 //2304 end
+    //                                 //Clear(TotaldecBladeQtyReceived);
+    //                                 // WarehouseReceiptLine.Reset();
+    //                                 // WarehouseReceiptLine.SetRange(WarehouseReceiptLine."No.", pWarehouseReceiptHeader."No.");
+    //                                 // //WarehouseReceiptLine.SetRange(WarehouseReceiptLine."Qty. Received", 0);
+    //                                 // WarehouseReceiptLine.SetRange(WarehouseReceiptLine."Item No.", BladeSku);
+    //                                 // if WarehouseReceiptLine.FindFirst() then begin
+    //                                 //     TotaldecBladeQtyReceived += decBladeQtyReceived;//temp 
+    //                                 //     Message('item no is %1 and total qty received is %2', WarehouseReceiptLine."Item No.", TotaldecBladeQtyReceived);
+    //                                 //     //if (decBladeQtyReceived > WarehouseReceiptLine."Qty. Sent to Blade") the n begin
+    //                                 //     if (TotaldecBladeQtyReceived > WarehouseReceiptLine."Qty. Sent to Blade") then begin
+    //                                 //         //WarehouseReceiptLine."Qty. to Receive") then begin 
+
+    //                                 //         BladeOverReceiptQty := decBladeQtyReceived - WarehouseReceiptLine."Qty. to Receive";
+    //                                 //         WarehouseReceiptLine.Validate("Over-Receipt Quantity", BladeOverReceiptQty);
+    //                                 //     end;
+    //                                 //     // if decBladeQtyReceived < WarehouseReceiptLine."Qty. to Receive" then begin
+    //                                 //     //     WarehouseReceiptLine.Validate(Quantity,decBladeQtyReceived);
+    //                                 //     // end;
+    //                                 //     //end;
+    //                                 //     //WarehouseReceiptLine.Validate(WarehouseReceiptLine."Qty. to Receive", (decBladeQtyReceived - WarehouseReceiptLine."Qty. Received"));
+    //                                 //     WarehouseReceiptLine.Validate(WarehouseReceiptLine."Qty. to Receive", (TotaldecBladeQtyReceived - WarehouseReceiptLine."Qty. Received"));
+    //                                 //     WarehouseReceiptLine.Modify();
+    //                                 //end;
+    //                             end;
+    //                         end;
+    //                     end;
+    //                     //start
+    //                     TempWarehouseReceiptLineBuffer.Reset();
+    //                     if TempWarehouseReceiptLineBuffer.FindFirst() then begin
+    //                         repeat
+    //                             WarehouseReceiptLine.Reset();
+    //                             WarehouseReceiptLine.SetCurrentKey("Blade Sku");//0605
+    //                             WarehouseReceiptLine.SetRange(WarehouseReceiptLine."No.", pWarehouseReceiptHeader."No.");
+    //                             //WarehouseReceiptLine.SetRange(WarehouseReceiptLine."Qty. Received", 0);
+    //                             //WarehouseReceiptLine.SetRange(WarehouseReceiptLine."Item No.", TempWarehouseReceiptLineBuffer."Item No.");
+    //                             WarehouseReceiptLine.SetRange(WarehouseReceiptLine."Blade Sku", TempWarehouseReceiptLineBuffer."Item No.");
+    //                             if WarehouseReceiptLine.FindFirst() then begin
+    //                                 //TotaldecBladeQtyReceived += decBladeQtyReceived;//temp 
+    //                                 //Message('item no is %1 and total qty received is %2', WarehouseReceiptLine."Item No.", TotaldecBladeQtyReceived);
+    //                                 //if (decBladeQtyReceived > WarehouseReceiptLine."Qty. Sent to Blade") the n begin
+    //                                 if (TempWarehouseReceiptLineBuffer."Qty. to Receive" > WarehouseReceiptLine."Qty. Sent to Blade") then begin
+    //                                     //WarehouseReceiptLine."Qty. to Receive") then begin 
+
+    //                                     BladeOverReceiptQty := TempWarehouseReceiptLineBuffer."Qty. to Receive" - WarehouseReceiptLine."Qty. Sent to Blade";//decBladeQtyReceived - WarehouseReceiptLine."Qty. to Receive";
+    //                                     WarehouseReceiptLine.Validate("Over-Receipt Quantity", BladeOverReceiptQty);
+    //                                 end;
+    //                                 // if decBladeQtyReceived < WarehouseReceiptLine."Qty. to Receive" then begin
+    //                                 //     WarehouseReceiptLine.Validate(Quantity,decBladeQtyReceived);
+    //                                 // end;
+    //                                 //end;
+    //                                 //WarehouseReceiptLine.Validate(WarehouseReceiptLine."Qty. to Receive", (decBladeQtyReceived - WarehouseReceiptLine."Qty. Received"));
+    //                                 //Clear(WarehouseReceiptLine."Qty. to Receive");
+    //                                 WarehouseReceiptLine.Validate(WarehouseReceiptLine."Qty. to Receive", (TempWarehouseReceiptLineBuffer."Qty. to Receive" - WarehouseReceiptLine."Qty. Received"));
+    //                                 WarehouseReceiptLine.Modify();
+    //                             end;
+    //                         until TempWarehouseReceiptLineBuffer.Next() = 0;
+    //                     end;
+    //                 end;
+    //             end;
+    //             pWarehouseReceiptHeader.Modify();
+    //         end;
+    //     end;
+    //     if TextJsonObject.Get('error', JsonToken) then begin
+    //         ErrorMsg := SelectJsonToken(TextJsonObject, '$.error.message').AsValue().AsText();
+    //         Error(ErrorMsg);
+    //     end;
+    // end;
 
     procedure GetWhseShipmentStatuses(HideDialog: Boolean)
     var
@@ -2457,8 +2654,7 @@ codeunit 65001 "Blade Mgt."
         end;
     end;
 
-    procedure GetJobPlanningLineStatuses(var pJobPlanningLine: Record "Job Planning Line";
-    HideDialog: boolean) //(var WhseShipmentHeader:Record "Warehouse Shipment Header")
+    procedure GetJobPlanningLineStatuses(var pJobPlanningLine: Record "Job Planning Line"; HideDialog: boolean)
     var
         lurl: Text;
         gheaders: HttpHeaders;
@@ -2483,16 +2679,12 @@ codeunit 65001 "Blade Mgt."
         gcontent: HttpContent;
         client: HttpClient;
     begin
-        Authentication();
+        if CurrentDateTime > ExpiryDateTime then
+            Authentication();
         lurl := InventorySetup."Blade Base Url" + '/orders/goodsouts/bulk_statuses';
         Clear(TextJsonObject);
         Clear(TextJsonObjectValue);
         Clear(TextJsonArray);
-        //TextJsonObject.Add('order_goodsout_ids', '');//moved down
-        //JobPlanningLine.Reset();
-        // JobPlanningLine.SetFilter("Blade ID", '<>%1', '');
-        // JobPlanningLine.SetRange("Sent to Blade", true);
-        //JobPlanningLine.SetFilter("Blade Status",'<>%1',JobPlanningLine."Blade Status"::despatched);
         if pJobPlanningLine.FindFirst() then begin
             TextJsonObject.Add('order_goodsout_ids', '');
             repeat
@@ -2500,10 +2692,8 @@ codeunit 65001 "Blade Mgt."
                 TextJsonObjectValue.SetValue(intBladeId);
                 TextJsonArray.Add(TextJsonObjectValue);
             until pJobPlanningLine.Next() = 0;
-            //end;moved down
             TextJsonObject.Replace('order_goodsout_ids', TextJsonArray);
             TextJsonObject.WriteTo(ltext);
-            //Message('request text is %1', ltext);//uz
             gcontent.WriteFrom(ltext);
             gcontent.ReadAs(ltext);
             EntryNo := InsertLog(ltext, lurl);
@@ -2514,7 +2704,6 @@ codeunit 65001 "Blade Mgt."
             gheaders.Add('Access-Token', sessiontoken);
             if Client.Put(lurl, gcontent, responseMsg) then begin
                 responseMsg.Content.ReadAs(lresptext);
-                //Message('response text is %1', lresptext);
                 ModifyLogwithResponse(lresptext, EntryNo);
                 Clear(TextJsonObject);
                 Clear(TextJsonArray);
@@ -2529,17 +2718,21 @@ codeunit 65001 "Blade Mgt."
                         if TextJsonObject.Get('status', JsonTokenStatus) then JsonTokenStatus.WriteTo(BladeStatus);
                         BladeId := DelChr(BladeId, '=', '"');
                         BladeStatus := DelChr(BladeStatus, '=', '"');
+                        //start
                         pJobPlanningLine.Reset();
                         pJobPlanningLine.SetCurrentKey("Job No.", "job task no.", "Line no.", "Blade ID");
+                        //"Blade ID", "Blade Status", "Sent to Blade", "Blade Reference"
+                        //was "Job No.", "job task no.", "Line no.", "Blade ID"
                         pJobPlanningLine.SetRange("Blade ID", BladeId);
+                        //end
                         if pJobPlanningLine.FindSet() then begin
-                            repeat //if (BladeId = '2483581') then
-                                   //Message('line no is %1', pJobPlanningLine."Line No.");
+                            repeat
                                 ValidateBladeJobLineStatus(BladeStatus, pJobPlanningLine);
                                 pJobPlanningLine.validate("Qty. to Transfer to Journal", pJobPlanningLine."Qty. Sent to Blade");
                                 pJobPlanningLine.Modify();
                             until pJobPlanningLine.Next() = 0;
                         end;
+                        Commit();
                     end;
                     if not HideDialog then Message('Job planning lines have been successfully synchronized with Blade.');
                 end;
@@ -2547,19 +2740,17 @@ codeunit 65001 "Blade Mgt."
                     ErrorMsg := SelectJsonToken(TextJsonObject, '$.error.message').AsValue().AsText();
                     Error(ErrorMsg);
                 end;
-            end; //moved here
+            end;
         end;
     end;
 
-    procedure GetAvailableQtyJob(var pJob: Record Job)
+    procedure GetAvailableQtyJob(var pJobPlanningLine: Record "Job Planning Line"; var pJob: Record Job)//adding param pJobPlanningline
     var
         lurl: Text;
         TextJsonObject: JsonObject;
         TextJsonArray: JsonArray;
         TextJsonObjectValue: JsonValue;
-        JobPlanningLine: Record "Job Planning Line";
         JobPlanningLineBuffer: record "Job Planning Line" temporary;
-        //Item:Record item;
         intBladeItemId: Integer;
         ltext: Text;
         gcontent: HttpContent;
@@ -2584,21 +2775,13 @@ codeunit 65001 "Blade Mgt."
         Clear(TextJsonObjectValue);
         Clear(TextJsonArray);
         TextJsonObject.Add('product_variation_id', '');
-        // JobPlanningLine.Reset();//1102
-        // JobPlanningLine.SetRange("Job No.", pJob."No.");
-        // JobPlanningLine.SetRange(Type, JobPlanningLine.Type::Item);
-        // JobPlanningLine.SetFilter("Blade Item ID", '<>%1', '');
-        // JobPlanningLine.SetRange("To Be Sent To Blade",true);//check
-        SetJobPlanningLineFiltersForMarkedToBeSent(JobPlanningLine, pJob);
-        if JobPlanningLine.Findset() then begin
-            repeat //Item.Get(JobPlanningLine."No.");
-                   //if (Item."Sent to Blade") and (Item."Blade Item ID" <> '') then begin
-                JobPlanningLine.CalcFields(JobPlanningLine."Blade Item ID");
-                Evaluate(intBladeItemId, JobPlanningLine."Blade Item ID");
+        if pJobPlanningLine.Findset() then begin
+            repeat
+                pJobPlanningLine.CalcFields(pJobPlanningLine."Blade Item ID");
+                Evaluate(intBladeItemId, pJobPlanningLine."Blade Item ID");
                 TextJsonObjectValue.SetValue(intBladeItemId);
                 TextJsonArray.Add(TextJsonObjectValue);
-            //end;
-            until JobPlanningLine.Next() = 0;
+            until pJobPlanningLine.Next() = 0;
         end;
         TextJsonObject.Replace('product_variation_id', TextJsonArray);
         TextJsonObject.Add('warehouse_code', 'CHR');
@@ -2628,13 +2811,19 @@ codeunit 65001 "Blade Mgt."
                     BladeId := DelChr(BladeId, '=', '"');
                     BladeAvailableQty := DelChr(BladeAvailableQty, '=', '"');
                     Evaluate(decBladeAvailableQty, BladeAvailableQty);
-                    //Window.Open(Text000);
-                    JobPlanningLine.Reset();
-                    JobPlanningLine.SetRange("Job No.", pJob."No.");
-                    JobPlanningLine.SetRange(Type, JobPlanningLine.Type::Item);
-                    JobPlanningLine.SetRange("Blade Item ID", BladeId);
-                    JobPlanningLine.ModifyAll("Available Qty.", decBladeAvailableQty);
-                    Window.Update(1, BladeId);
+                    pJobPlanningLine.Reset();
+                    pJobPlanningLine.SetCurrentKey("To Be Sent To Blade");
+                    pJobPlanningLine.SetRange("To Be Sent To Blade", true);
+                    pJobPlanningLine.SetRange("Job No.", pJob."No.");
+                    pJobPlanningLine.SetRange(Type, pJobPlanningLine.Type::Item);
+                    pJobPlanningLine.SetRange("Blade Item ID", BladeId);
+                    if pJobPlanningLine.FindSet() then
+                        repeat
+                            pJobPlanningLine."Available Qty." := decBladeAvailableQty;
+                            pJobPlanningLine.Modify();
+                            Window.Update(1, BladeId);
+                        until pJobPlanningLine.Next() = 0;
+                    Commit();
                 end;
                 Window.Close();
             end;
@@ -3205,7 +3394,7 @@ codeunit 65001 "Blade Mgt."
         //end 13/04/2021
         JobPlanningLine.Reset();
         SetJobPlanningLineFiltersUpdateStatus(JobPlanningLine);
-        JobPlanningLine.SetRange("Blade Status", JobPlanningLine."Blade Status"::despatched);
+        JobPlanningLine.SetRange("Blade Status", JobPlanningLine."Blade Status"::despatched);// awaiting collection another form of despatch? 0403
         JobPlanningLine.SetFilter("Remaining Qty.", '<>%1', 0);
         if JobPlanningLine.FindSet() then begin
             repeat
@@ -3356,6 +3545,7 @@ codeunit 65001 "Blade Mgt."
     pJob: record Job)
     begin
         pJobPlanningLine.Reset();
+        pJobPlanningLine.SetCurrentKey("To Be Sent To Blade");
         pJobPlanningLine.SetRange("Job No.", pJob."No.");
         pJobPlanningLine.SetRange(Type, pJobPlanningLine.Type::Item);
         pJobPlanningLine.SetFilter("Blade Item ID", '<>%1', '');
@@ -3364,284 +3554,314 @@ codeunit 65001 "Blade Mgt."
 
     //27/10/2021 get serial numbers and ICCID Nos start
 
-    procedure GetDespatchAttributes(var pWhseShipmentHeader: Record "Warehouse Shipment Header")
-    var
-        lurl: Text;
-        ltext: Text;
-        gcontent: HttpContent;
-        gheaders: HttpHeaders;
-        requestMsg: HttpRequestMessage;
-        responseMsg: HttpResponseMessage;
-        lresptext: text;
-        WhseShipmentLine: Record "Warehouse Shipment Line";
-        TextJsonObject: JsonObject;
-        JsonToken: JsonToken;
-        BladeStatus: Text;
-        ErrorMsg: Text;
-        WebServiceFailedErr: Label 'The call to webservice failed.';
-        client: HttpClient;
-        TextJsonArray: JsonArray;
-        JsonTokenData: JsonToken;
-        i: Integer;
-        BladeSku: Text;
-        AttributeName: Text;
-        AttributeValue: Text;
-        TrackingSpecification: Record "Tracking Specification";
-        ReservationEntry: Record "Reservation Entry";
-        SalesLine: Record "Sales Line";
-        ItemTrackingDataCollection: Codeunit "Item Tracking Data Collection";
-        LotNo: Code[50];
-        PageItemTrackingLines: Page "Item Tracking Lines";
-        SalesHeader: Record "Sales Header";
-        Text006: Label 'The corrections cannot be saved as excess quantity has been defined.\Close the form anyway?';
-    //WhseShipmentLine: Record "Warehouse Shipment Line";
-    begin
-        /*Authentication();
-        lurl := InventorySetup."Blade Base Url" + '/orders/goodsouts/' + pWhseShipmentHeader."Blade ID" + '/despatch_attributes'; //check
-        gheaders := Client.DefaultRequestHeaders();
-        gheaders.Remove('Accept');
-        gheaders.Add('Accept', 'application/json');
-        gheaders.Remove('User-Agent');
-        gheaders.Add('User-Agent', 'Java/1.7.0_51');
-        gheaders.TryAddWithoutValidation('Content-Type', 'application/json');
-        gheaders.TryAddWithoutValidation('Access-Token', sessiontoken);
-        requestMsg.SetRequestUri(lurl);
-        requestMsg.Method := 'GET';
-        if not Client.Send(requestMsg, responseMsg) then Error(WebServiceFailedErr);
-        responseMsg.Content.ReadAs(lresptext);
-        if responseMsg.HttpStatusCode() = 500 then Error(responseMsg.ReasonPhrase());
-        JsonToken.ReadFrom(lresptext);
-        Message('API Response is %1', lresptext);
-        TextJsonObject := JsonToken.AsObject();
-        if TextJsonObject.Get('data', JsonToken) then begin
-            TextJsonArray := JsonToken.AsArray();
-            for i := 0 to TextJsonArray.Count - 1 do begin
-                TextJsonArray.Get(i, JsonTokenData);
-                TextJsonObject := JsonTokenData.AsObject();
-                if TextJsonObject.Get('sku', JsonTokenData) then JsonTokenData.WriteTo(BladeSku);
-                if TextJsonObject.Get('attribute_name', JsonToken) then JsonToken.WriteTo(AttributeName);//check if working
-                if TextJsonObject.Get('attribute_value', JsonToken) then JsonToken.WriteTo(AttributeValue);
-                BladeSku := DelChr(BladeSku, '=', '"');
-                AttributeName := DelChr(AttributeName, '=', '"');
-                AttributeValue := DelChr(AttributeValue, '=', '"');
-                InsertLog(StrSubstNo('Blade Id %1 and Item SKU. %2 and Attribute Name %3 and Attribute Value %4', pWhseShipmentHeader."No.", BladeSku, AttributeName, AttributeValue), lurl);
+    // procedure GetDespatchAttributes(var pWhseShipmentHeader: Record "Warehouse Shipment Header")
+    // var
+    //     lurl: Text;
+    //     ltext: Text;
+    //     gcontent: HttpContent;
+    //     gheaders: HttpHeaders;
+    //     requestMsg: HttpRequestMessage;
+    //     responseMsg: HttpResponseMessage;
+    //     lresptext: text;
+    //     WhseShipmentLine: Record "Warehouse Shipment Line";
+    //     TextJsonObject: JsonObject;
+    //     JsonToken: JsonToken;
+    //     BladeStatus: Text;
+    //     ErrorMsg: Text;
+    //     WebServiceFailedErr: Label 'The call to webservice failed.';
+    //     client: HttpClient;
+    //     TextJsonArray: JsonArray;
+    //     JsonTokenData: JsonToken;
+    //     i: Integer;
+    //     BladeSku: Text;
+    //     AttributeName: Text;
+    //     AttributeValue: Text;
+    //     TrackingSpecification: Record "Tracking Specification";
+    //     ReservationEntry: Record "Reservation Entry";
+    //     SalesLine: Record "Sales Line";
+    //     ItemTrackingDataCollection: Codeunit "Item Tracking Data Collection";
+    //     LotNo: Code[50];
+    //     PageItemTrackingLines: Page "Item Tracking Lines";
+    //     SalesHeader: Record "Sales Header";
+    //     Text006: Label 'The corrections cannot be saved as excess quantity has been defined.\Close the form anyway?';
+    // //WhseShipmentLine: Record "Warehouse Shipment Line";
+    // begin
+    //     Authentication();
+    //     lurl := InventorySetup."Blade Base Url" + '/orders/goodsouts/' + pWhseShipmentHeader."Blade ID" + '/despatch_attributes'; //check
+    //     gheaders := Client.DefaultRequestHeaders();
+    //     gheaders.Remove('Accept');
+    //     gheaders.Add('Accept', 'application/json');
+    //     gheaders.Remove('User-Agent');
+    //     gheaders.Add('User-Agent', 'Java/1.7.0_51');
+    //     gheaders.TryAddWithoutValidation('Content-Type', 'application/json');
+    //     gheaders.TryAddWithoutValidation('Access-Token', sessiontoken);
+    //     requestMsg.SetRequestUri(lurl);
+    //     requestMsg.Method := 'GET';
+    //     if not Client.Send(requestMsg, responseMsg) then Error(WebServiceFailedErr);
+    //     responseMsg.Content.ReadAs(lresptext);
+    //     if responseMsg.HttpStatusCode() = 500 then Error(responseMsg.ReasonPhrase());
+    //     JsonToken.ReadFrom(lresptext);
+    //     //Message('API Response is %1', lresptext);
+    //     TextJsonObject := JsonToken.AsObject();
+    //     if TextJsonObject.Get('data', JsonToken) then begin
+    //         TextJsonArray := JsonToken.AsArray();
+    //         for i := 0 to TextJsonArray.Count - 1 do begin
+    //             TextJsonArray.Get(i, JsonTokenData);
+    //             TextJsonObject := JsonTokenData.AsObject();
+    //             if TextJsonObject.Get('sku', JsonTokenData) then JsonTokenData.WriteTo(BladeSku);
+    //             if TextJsonObject.Get('attribute_name', JsonToken) then JsonToken.WriteTo(AttributeName);//check if working
+    //             if TextJsonObject.Get('attribute_value', JsonToken) then JsonToken.WriteTo(AttributeValue);
+    //             BladeSku := DelChr(BladeSku, '=', '"');
+    //             AttributeName := DelChr(AttributeName, '=', '"');
+    //             AttributeValue := DelChr(AttributeValue, '=', '"');
+    //             InsertLog(StrSubstNo('Blade Id %1 and Item SKU. %2 and Attribute Name %3 and Attribute Value %4', pWhseShipmentHeader."No.", BladeSku, AttributeName, AttributeValue), lurl);
+    //             Message('Blade Sku is %1, Attribute Name is %2 and attribute value is %3', BladeSku, AttributeName, AttributeValue);
+    //             WhseShipmentLine.Reset();
+    //             WhseShipmentLine.SetCurrentKey("Blade Sku", "Sent to Blade");
+    //             WhseShipmentLine.SetRange("No.", pWhseShipmentHeader."No.");
+    //             WhseShipmentLine.SetRange("Blade Sku", BladeSku);
+    //             if WhseShipmentLine.FindFirst() then begin
+    //                 SalesLine.Reset();
+    //                 SalesLine.get(WhseShipmentLine."Source Document", WhseShipmentLine."Source No.", WhseShipmentLine."Source Line No.");
+    //                 SalesHeader.get(SalesLine."Document Type", SalesLine."Document No.");
+    //                 if not SerialNoExists(SalesLine) then
+    //                     InsertSerialNos(SalesHeader, SalesLine, AttributeName, AttributeValue)
+    //                 else
+    //                     ModifySerialNos(SalesLine, AttributeName, AttributeValue);
+    //                 //UpdateOrderTrackingAndReestablishReservation(); no needed?
+    //             end;
+    //         end;
+    //     end;
+    //     if TextJsonObject.Get('error', JsonToken) then begin
+    //         ErrorMsg := SelectJsonToken(TextJsonObject, '$.error.message').AsValue().AsText();
+    //         Error(ErrorMsg);
+    //     end;
+    // end;
 
-                WhseShipmentLine.Reset();
-                //WhseShipmentLine.SetCurrentKey()
-                WhseShipmentLine.SetRange("No.", pWhseShipmentHeader."No.");
-                WhseShipmentLine.SetRange("Blade Sku", BladeSku);
-                if WhseShipmentLine.FindFirst() then begin
-                    if SalesLine.Get(WhseShipmentLine."Source Subtype", WhseShipmentLine."Source No.", WhseShipmentLine."Source Line No.") then
-                        TrackingSpecification.InitFromSalesLine(SalesLine);
-                    // if TrackingSpecification."Serial No." <> '' then begin
-                    //     ItemTrackingDataCollection.FindLotNoBySNSilent(LotNo, TrackingSpecification);
-                    //     TrackingSpecification.Validate("Lot No.", LotNo);
-                    // end; not needed
-                    SecondSourceQtyArray[1] := DATABASE::"Warehouse Shipment Line";
-                    SecondSourceQtyArray[2] := WhseShipmentLine."Qty. to Ship (Base)";
-                    SecondSourceQtyArray[3] := 0;
-                    TrackingSpecification.Validate("Quantity (Base)", 1);
-                    //CheckLine(TrackingSpecification);
-                    //InsertRecord(TrackingSpecification, SecondSourceQtyArray);
-                    //CalculateSums(TrackingSpecification, SecondSourceQtyArray);
-                    //UpdateTrackingData on modification?
-                    //if not UpdateUndefinedQty then
-                    //Message(text006);
+    // procedure SerialNoExists(pSalesLine: Record "Sales Line"): Boolean
+    // var
+    //     ReservationEntry: Record "Reservation Entry";
+    // begin
+    //     ReservationEntry.Reset();
+    //     ReservationEntry.SetCurrentKey("Item No.", "Source Type", "source subtype", "Reservation Status", "Location Code");
+    //     //"Item No.", "Source Type", "Source Subtype", "Reservation Status", "Location Code", "Variant Code", "Shipment Date", "Expected Receipt Date", "Serial No.", "Lot No.", "Package No."
+    //     ReservationEntry.SetRange("Item No.", pSalesLine."No.");
+    //     ReservationEntry.SetRange("Reservation Status", ReservationEntry."Reservation Status"::Surplus);
+    //     ReservationEntry.SetRange("Location Code", pSalesLine."Location Code");
+    //     ReservationEntry.SetRange("Source Type", 37);
+    //     ReservationEntry.SetRange("Source Subtype", 1);
+    //     ReservationEntry.SetRange("Source ID", pSalesLine."Document No.");
+    //     ReservationEntry.SetRange("Source Ref. No.", pSalesLine."Line No.");
+    //     ReservationEntry.SetRange("Item Tracking", ReservationEntry."Item Tracking"::"Serial No.");
+    //     if not ReservationEntry.FindSet() then
+    //         exit(false);
 
-                    if not ItemTrackingDataCollection.RefreshTrackingAvailability(TrackingSpecification, false) then begin
-                        //CurrPage.Update();
+    //     if not (ReservationEntry.Count = pSalesLine."Quantity (Base)") then begin
+    //         ReservationEntry.DeleteAll();
+    //         exit(false);
+    //     end;
 
-                        //IsHandled := false;
-                        //OnQueryClosePageOnBeforeConfirmClosePage(Rec, isHandled);
-                        //if IsHandled then
-                        //Exit(true);
+    //     exit(true);
+    // end;
 
-                        //exit(Confirm(AvailabilityWarningsQst, true));
-                    end;
+    // procedure InsertSerialNos(var pSalesHeader: Record "Sales Header"; var pSalesLine: Record "Sales Line"; AttributeName: text[50]; AttributeValue: Code[50])
+    // var
+    //     ReservationEntry: Record "Reservation Entry";
+    //     //pageItemTrackingLine: Page "Item Tracking Lines";
+    //     CompanyInfo: Record "Company Information";
+    // //ItemUnitOfMeasure : Record "Item Unit of Measure";
+    // begin
+    //     CompanyInfo.get();
+    //     //ItemUnitOfMeasure.Reset();
+    //     //if ItemUnitOfMeasure.Get(pSalesLine."No.",pSalesLine.unit of)
+    //     ReservationEntry.Init();
+    //     ReservationEntry."Entry No." := GetLastEntryNo();
+    //     ReservationEntry."Item No." := pSalesLine."No.";
+    //     //BladeSku;//change to our item
+    //     ReservationEntry."Location Code" := pSalesHeader."Location Code";
+    //     ReservationEntry."Quantity (Base)" := -1;
+    //     ReservationEntry."Reservation Status" := ReservationEntry."Reservation Status"::Surplus;
+    //     ReservationEntry."Creation Date" := WorkDate();
+    //     ReservationEntry."Source Type" := 37;
+    //     ReservationEntry."Source Subtype" := 1;
+    //     ReservationEntry."Source ID" := pSalesHeader."No.";
+    //     ReservationEntry."Source Ref. No." := pSalesLine."Line No.";
+    //     ReservationEntry."Shipment Date" := pSalesLine."Shipment Date";
+    //     if AttributeName = 'Serial Number' then
+    //         ReservationEntry."Serial No." := AttributeValue;
+    //     ReservationEntry."Created By" := UserId;
+    //     ReservationEntry.Positive := false;
+    //     //ReservationEntry."Qty. per Unit of Measure" := pSalesLine."Qty. per Unit of Measure";
+    //     ReservationEntry.Validate("Qty. per Unit of Measure", pSalesLine."Qty. per Unit of Measure");
+    //     // ReservationEntry.Quantity := -1;
+    //     // ReservationEntry."Qty. to Handle (Base)" := -1;
+    //     // ReservationEntry."Qty. to Invoice (Base)" := -1;
+    //     //check function GetLastEntryNo in reservation entry, erhaps can be replaced with customized one
+    //     ReservationEntry.Validate("Quantity (Base)", -1);
+    //     ReservationEntry."Item Tracking" := ReservationEntry."Item Tracking"::"Serial No.";
+    //     ReservationEntry.Insert();
+    // end;
 
-                    //insert in Tracking specification 337
-                    ///InsertSerialNos(BladeSku, pWhseShipmentHeader, WhseShipmentLine);
-                    //InsertTrackingSpecification();
-                end;
-            end;
-        end;
-        if TextJsonObject.Get('error', JsonToken) then begin
-            ErrorMsg := SelectJsonToken(TextJsonObject, '$.error.message').AsValue().AsText();
-            Error(ErrorMsg);
-        end;*/
+    // procedure ModifySerialNos(pSalesLine: Record "Sales Line"; AttributeName: text[50]; AttributeValue: Code[50])
+    // var
+    //     ReservationEntry: Record "Reservation Entry";
+    // begin
+    //     ReservationEntry.Reset();
+    //     ReservationEntry.SetCurrentKey("Item No.", "Source Type", "source subtype", "Reservation Status", "Location Code");
+    //     ReservationEntry.SetRange("Item No.", pSalesLine."No.");
+    //     ReservationEntry.SetRange("Location Code", pSalesLine."Location Code");
+    //     ReservationEntry.SetRange("Reservation Status", ReservationEntry."Reservation Status"::Surplus);
+    //     ReservationEntry.SetRange("Source Type", 37);
+    //     ReservationEntry.SetRange("Source Subtype", 1);
+    //     ReservationEntry.SetRange("Source ID", pSalesLine."Document No.");
+    //     ReservationEntry.SetRange("Source Ref. No.", pSalesLine."Line No.");
+    //     ReservationEntry.SetRange("Item Tracking", ReservationEntry."Item Tracking"::"Serial No.");
+    //     if ReserVationEntry.FindSet() then begin
+    //         ReservationEntry."Serial No." := AttributeValue;
+    //     end;
 
-        //Clear(TextJsonObject);
-        //pWhseShipmentHeader.TestField("Reason Code");
-        //if ReasonCode.Get(pWhseShipmentHeader."Reason Code") then TextJsonObject.Add('reason', ReasonCode.Description);
-        //TextJsonObject.WriteTo(ltext);
-        //gcontent.WriteFrom(ltext);
-        //gcontent.ReadAs(ltext);
-        // EntryNo := InsertLog(ltext, lurl);
-        // gcontent.GetHeaders(gheaders);
-        // gheaders.Remove('Content-Type');
-        // gheaders.Add('Content-Type', 'application/json');
-        // gheaders.Remove('Access-Token');
-        // gheaders.Add('Access-Token', sessiontoken);
-        // if Client.Put(lurl, gcontent, responseMsg) then begin
-        //     responseMsg.Content.ReadAs(lresptext);
-        //     ModifyLogwithResponse(lresptext, EntryNo);
-        // Clear(TextJsonObject);
-        // JsonToken.ReadFrom(lresptext);
-        // TextJsonObject := JsonToken.AsObject();
-        // if TextJsonObject.Get('data', JsonToken) then begin
-        //     //if not Deleted then begin
-        //         BladeStatus := SelectJsonToken(TextJsonObject, '$.data.status').AsValue().AsText();
-        //         BladeStatus := DelChr(BladeStatus, '=', '"');
-        //         ValidateBladeWhseShipmentStatus(BladeStatus, pWhseShipmentHeader);
-        //         WhseShipmentLine.Reset();
-        //         WhseShipmentLine.SetRange("No.", pWhseShipmentHeader."No.");
-        //         WhseShipmentLine.SetRange("Sent to Blade", true);
-        //         WhseShipmentLine.ModifyAll("Blade Line Status", WhseShipmentLine."Blade Line Status"::void, false);
-        //         if pWhseShipmentHeader.Modify() then //false?
-        //             Message('Warehouse Shipment No. %1 has been succcessfully cancelled.', pWhseShipmentHeader."No.");
-        //     //end;
-        // end;
-        // if TextJsonObject.Get('error', JsonToken) then begin
-        //     ErrorMsg := SelectJsonToken(TextJsonObject, '$.error.message').AsValue().AsText();
-        //     Error(ErrorMsg);
-        // end;
-        //end;
+    // end;
 
-        WhseShipmentLine.Reset();
-        WhseShipmentLine.SetRange("No.", pWhseShipmentHeader."No.");
-        WhseShipmentLine.SetRange("Item No.", '1001');
-        if WhseShipmentLine.FindFirst() then;
+    // local procedure GetLastEntryNo1(): integer
+    // var
+    //     TrackingSepcification: Record "Tracking Specification";
+    // begin
+    //     TrackingSepcification.Reset();
+    //     if TrackingSepcification.FindLast() then
+    //         exit(TrackingSepcification."Entry No." + 1);
+    //     exit(1);
+    // end;
 
-        SalesLine.Reset();
-        SalesLine.get(WhseShipmentLine."Source Document", WhseShipmentLine."Source No.", WhseShipmentLine."Source Line No.");
-        SalesHeader.get(SalesLine."Document Type", SalesLine."Document No.");
+    // local procedure GetLastEntryNo(): integer
+    // var
+    //     ReservationEntry: Record "Reservation Entry";
+    // begin
+    //     ReservationEntry.Reset();
+    //     if ReservationEntry.FindLast() then
+    //         exit(ReservationEntry."Entry No." + 1);
+    //     exit(1);
+    // end;
 
+    // local procedure UpdateOrderTrackingAndReestablishReservation()
+    // var
+    //     TempReservEntry: Record "Reservation Entry" temporary;
+    //     LateBindingMgt: Codeunit "Late Binding Management";
+    //     ReservEngineMgt: Codeunit "Reservation Engine Mgt.";
+    //     Item: Record Item;
+    //     TempItemTrackLineReserv: Record "Tracking Specification" temporary;
+    // begin
+    //     TempItemTrackLineReserv.TransferFields(TrackingSpecification);
+    //     TempItemTrackLineReserv.Insert();
 
-        InsertSerialNos('1001', SalesHeader, SalesLine);
-        UpdateOrderTrackingAndReestablishReservation();
-        //PageItemTrackingLines.WriteToDatabase();
-    end;
+    //     // Order Tracking
+    //     if ReservEngineMgt.CollectAffectedSurplusEntries(TempReservEntry) then begin
+    //         LateBindingMgt.SetOrderTrackingSurplusEntries(TempReservEntry);
+    //         if Item."Order Tracking Policy" <> Item."Order Tracking Policy"::None then
+    //             ReservEngineMgt.UpdateOrderTracking(TempReservEntry);
+    //     end;
 
-    local procedure UpdateOrderTrackingAndReestablishReservation()
-    var
-        TempReservEntry: Record "Reservation Entry" temporary;
-        LateBindingMgt: Codeunit "Late Binding Management";
-        ReservEngineMgt: Codeunit "Reservation Engine Mgt.";
-        Item: Record Item;
-        TempItemTrackLineReserv: Record "Tracking Specification" temporary;
-    begin
-        TempItemTrackLineReserv.TransferFields(TrackingSpecification);
-        TempItemTrackLineReserv.Insert();
+    //     // Late Binding
+    //     if TempItemTrackLineReserv.FindSet() then
+    //         repeat
+    //             LateBindingMgt.ReserveItemTrackingLine(TempItemTrackLineReserv, 0, TempItemTrackLineReserv."Quantity (Base)");
+    //             SetQtyToHandleAndInvoice(TempItemTrackLineReserv);
+    //         until TempItemTrackLineReserv.Next() = 0;
+    //     TempItemTrackLineReserv.DeleteAll();
+    //     //TrackingSpecification.Delete();
+    // end;
 
-        // Order Tracking
-        if ReservEngineMgt.CollectAffectedSurplusEntries(TempReservEntry) then begin
-            LateBindingMgt.SetOrderTrackingSurplusEntries(TempReservEntry);
-            if Item."Order Tracking Policy" <> Item."Order Tracking Policy"::None then
-                ReservEngineMgt.UpdateOrderTracking(TempReservEntry);
-        end;
+    // local procedure SetQtyToHandleAndInvoice(TrackingSpecification: Record "Tracking Specification")
+    // var
+    //     ReservEntry1: Record "Reservation Entry";
+    //     TotalQtyToHandle: Decimal;
+    //     TotalQtyToInvoice: Decimal;
+    //     QtyToHandleThisLine: Decimal;
+    //     QtyToInvoiceThisLine: Decimal;
+    //     ModifyLine: Boolean;
+    //     ItemTrackingMgt: Codeunit "Item Tracking Management";
+    // begin
+    //     //OnBeforeSetQtyToHandleAndInvoice(TrackingSpecification, IsCorrection, CurrentSignFactor);
 
-        // Late Binding
-        if TempItemTrackLineReserv.FindSet() then
-            repeat
-                LateBindingMgt.ReserveItemTrackingLine(TempItemTrackLineReserv, 0, TempItemTrackLineReserv."Quantity (Base)");
-                SetQtyToHandleAndInvoice(TempItemTrackLineReserv);
-            until TempItemTrackLineReserv.Next() = 0;
-        TempItemTrackLineReserv.DeleteAll();
-        //TrackingSpecification.Delete();
-    end;
+    //     //if IsCorrection then
+    //     //exit;
 
-    local procedure SetQtyToHandleAndInvoice(TrackingSpecification: Record "Tracking Specification")
-    var
-        ReservEntry1: Record "Reservation Entry";
-        TotalQtyToHandle: Decimal;
-        TotalQtyToInvoice: Decimal;
-        QtyToHandleThisLine: Decimal;
-        QtyToInvoiceThisLine: Decimal;
-        ModifyLine: Boolean;
-        ItemTrackingMgt: Codeunit "Item Tracking Management";
-    begin
-        //OnBeforeSetQtyToHandleAndInvoice(TrackingSpecification, IsCorrection, CurrentSignFactor);
+    //     TotalQtyToHandle := -TrackingSpecification."Qty. to Handle (Base)"; //* CurrentSignFactor;
+    //     TotalQtyToInvoice := -TrackingSpecification."Qty. to Invoice (Base)";//* CurrentSignFactor;
 
-        //if IsCorrection then
-        //exit;
+    //     ReservEntry1.TransferFields(TrackingSpecification);
+    //     ReservEntry1.SetPointerFilter();
+    //     ReservEntry1.SetTrackingFilterFromReservEntry(ReservEntry1);
+    //     if TrackingSpecification.TrackingExists() then begin
+    //         ItemTrackingMgt.SetPointerFilter(TrackingSpecification);
+    //         TrackingSpecification.SetTrackingFilterFromSpec(TrackingSpecification);
+    //         if TrackingSpecification.Find('-') then
+    //             repeat
+    //                 if not TrackingSpecification.Correction then begin
+    //                     ModifyLine := false;
+    //                     QtyToInvoiceThisLine :=
+    //                       TrackingSpecification."Quantity Handled (Base)" - TrackingSpecification."Quantity Invoiced (Base)";
+    //                     if Abs(QtyToInvoiceThisLine) > Abs(TotalQtyToInvoice) then
+    //                         QtyToInvoiceThisLine := TotalQtyToInvoice;
+    //                     if TrackingSpecification."Qty. to Invoice (Base)" <> QtyToInvoiceThisLine then begin
+    //                         TrackingSpecification."Qty. to Invoice (Base)" := QtyToInvoiceThisLine;
+    //                         ModifyLine := true;
+    //                     end;
+    //                     //OnSetQtyToHandleAndInvoiceOnBeforeTrackingSpecModify(TrackingSpecification, TotalTrackingSpecification, ModifyLine);
+    //                     if ModifyLine then
+    //                         TrackingSpecification.Modify();
+    //                     TotalQtyToInvoice -= QtyToInvoiceThisLine;
+    //                 end;
+    //             until (TrackingSpecification.Next() = 0);
+    //     end;
 
-        TotalQtyToHandle := -TrackingSpecification."Qty. to Handle (Base)"; //* CurrentSignFactor;
-        TotalQtyToInvoice := -TrackingSpecification."Qty. to Invoice (Base)";//* CurrentSignFactor;
+    //     if TrackingSpecification.NonSerialTrackingExists() then begin
+    //         if (TrackingSpecification."Source Type" = DATABASE::"Transfer Line") and
+    //            (TrackingSpecification."Source Subtype" = 1) and
+    //            (TrackingSpecification."Source Prod. Order Line" <> 0) // Shipped
+    //         then
+    //             ReservEntry1.SetRange("Source Ref. No.");
 
-        ReservEntry1.TransferFields(TrackingSpecification);
-        ReservEntry1.SetPointerFilter();
-        ReservEntry1.SetTrackingFilterFromReservEntry(ReservEntry1);
-        if TrackingSpecification.TrackingExists() then begin
-            ItemTrackingMgt.SetPointerFilter(TrackingSpecification);
-            TrackingSpecification.SetTrackingFilterFromSpec(TrackingSpecification);
-            if TrackingSpecification.Find('-') then
-                repeat
-                    if not TrackingSpecification.Correction then begin
-                        ModifyLine := false;
-                        QtyToInvoiceThisLine :=
-                          TrackingSpecification."Quantity Handled (Base)" - TrackingSpecification."Quantity Invoiced (Base)";
-                        if Abs(QtyToInvoiceThisLine) > Abs(TotalQtyToInvoice) then
-                            QtyToInvoiceThisLine := TotalQtyToInvoice;
-                        if TrackingSpecification."Qty. to Invoice (Base)" <> QtyToInvoiceThisLine then begin
-                            TrackingSpecification."Qty. to Invoice (Base)" := QtyToInvoiceThisLine;
-                            ModifyLine := true;
-                        end;
-                        //OnSetQtyToHandleAndInvoiceOnBeforeTrackingSpecModify(TrackingSpecification, TotalTrackingSpecification, ModifyLine);
-                        if ModifyLine then
-                            TrackingSpecification.Modify();
-                        TotalQtyToInvoice -= QtyToInvoiceThisLine;
-                    end;
-                until (TrackingSpecification.Next() = 0);
-        end;
+    //         for ReservEntry1."Reservation Status" := ReservEntry1."Reservation Status"::Reservation to
+    //             ReservEntry1."Reservation Status"::Prospect
+    //         do begin
+    //             ReservEntry1.SetRange("Reservation Status", ReservEntry1."Reservation Status");
+    //             if ReservEntry1.Find('-') then
+    //                 repeat
+    //                     ModifyLine := false;
+    //                     QtyToHandleThisLine := ReservEntry1."Quantity (Base)";
+    //                     QtyToInvoiceThisLine := QtyToHandleThisLine;
 
-        if TrackingSpecification.NonSerialTrackingExists() then begin
-            if (TrackingSpecification."Source Type" = DATABASE::"Transfer Line") and
-               (TrackingSpecification."Source Subtype" = 1) and
-               (TrackingSpecification."Source Prod. Order Line" <> 0) // Shipped
-            then
-                ReservEntry1.SetRange("Source Ref. No.");
+    //                     if Abs(QtyToHandleThisLine) > Abs(TotalQtyToHandle) then
+    //                         QtyToHandleThisLine := TotalQtyToHandle;
+    //                     if Abs(QtyToInvoiceThisLine) > Abs(TotalQtyToInvoice) then
+    //                         QtyToInvoiceThisLine := TotalQtyToInvoice;
 
-            for ReservEntry1."Reservation Status" := ReservEntry1."Reservation Status"::Reservation to
-                ReservEntry1."Reservation Status"::Prospect
-            do begin
-                ReservEntry1.SetRange("Reservation Status", ReservEntry1."Reservation Status");
-                if ReservEntry1.Find('-') then
-                    repeat
-                        ModifyLine := false;
-                        QtyToHandleThisLine := ReservEntry1."Quantity (Base)";
-                        QtyToInvoiceThisLine := QtyToHandleThisLine;
-
-                        if Abs(QtyToHandleThisLine) > Abs(TotalQtyToHandle) then
-                            QtyToHandleThisLine := TotalQtyToHandle;
-                        if Abs(QtyToInvoiceThisLine) > Abs(TotalQtyToInvoice) then
-                            QtyToInvoiceThisLine := TotalQtyToInvoice;
-
-                        if (ReservEntry1."Qty. to Handle (Base)" <> QtyToHandleThisLine) or
-                           (ReservEntry1."Qty. to Invoice (Base)" <> QtyToInvoiceThisLine) and not ReservEntry1.Correction
-                        then begin
-                            ReservEntry1."Qty. to Handle (Base)" := QtyToHandleThisLine;
-                            ReservEntry1."Qty. to Invoice (Base)" := QtyToInvoiceThisLine;
-                            //OnSetQtyToHandleAndInvoiceOnBeforeReservEntryModify(ReservEntry1, TrackingSpecification);
-                            ModifyLine := true;
-                        end;
-                        //OnAfterSetQtyToHandleAndInvoiceOnBeforeReservEntryModify(ReservEntry1, TrackingSpecification, TotalTrackingSpecification, ModifyLine);
-                        if ModifyLine then
-                            ReservEntry1.Modify();
-                        TotalQtyToHandle -= QtyToHandleThisLine;
-                        TotalQtyToInvoice -= QtyToInvoiceThisLine;
-                    until (ReservEntry1.Next() = 0);
-            end
-        end else
-            if ReservEntry1.Find('-') then
-                if (ReservEntry1."Qty. to Handle (Base)" <> TotalQtyToHandle) or
-                   (ReservEntry1."Qty. to Invoice (Base)" <> TotalQtyToInvoice) and not ReservEntry1.Correction
-                then begin
-                    ReservEntry1."Qty. to Handle (Base)" := TotalQtyToHandle;
-                    ReservEntry1."Qty. to Invoice (Base)" := TotalQtyToInvoice;
-                    //OnSetQtyToHandleAndInvoiceOnBeforeReservEntryModify(ReservEntry1, TrackingSpecification);
-                    ReservEntry1.Modify();
-                end;
-    end;
+    //                     if (ReservEntry1."Qty. to Handle (Base)" <> QtyToHandleThisLine) or
+    //                        (ReservEntry1."Qty. to Invoice (Base)" <> QtyToInvoiceThisLine) and not ReservEntry1.Correction
+    //                     then begin
+    //                         ReservEntry1."Qty. to Handle (Base)" := QtyToHandleThisLine;
+    //                         ReservEntry1."Qty. to Invoice (Base)" := QtyToInvoiceThisLine;
+    //                         //OnSetQtyToHandleAndInvoiceOnBeforeReservEntryModify(ReservEntry1, TrackingSpecification);
+    //                         ModifyLine := true;
+    //                     end;
+    //                     //OnAfterSetQtyToHandleAndInvoiceOnBeforeReservEntryModify(ReservEntry1, TrackingSpecification, TotalTrackingSpecification, ModifyLine);
+    //                     if ModifyLine then
+    //                         ReservEntry1.Modify();
+    //                     TotalQtyToHandle -= QtyToHandleThisLine;
+    //                     TotalQtyToInvoice -= QtyToInvoiceThisLine;
+    //                 until (ReservEntry1.Next() = 0);
+    //         end
+    //     end else
+    //         if ReservEntry1.Find('-') then
+    //             if (ReservEntry1."Qty. to Handle (Base)" <> TotalQtyToHandle) or
+    //                (ReservEntry1."Qty. to Invoice (Base)" <> TotalQtyToInvoice) and not ReservEntry1.Correction
+    //             then begin
+    //                 ReservEntry1."Qty. to Handle (Base)" := TotalQtyToHandle;
+    //                 ReservEntry1."Qty. to Invoice (Base)" := TotalQtyToInvoice;
+    //                 //OnSetQtyToHandleAndInvoiceOnBeforeReservEntryModify(ReservEntry1, TrackingSpecification);
+    //                 ReservEntry1.Modify();
+    //             end;
+    // end;
 
     // procedure UpdateUndefinedQty(): Boolean
     // var
@@ -3713,15 +3933,7 @@ codeunit 65001 "Blade Mgt."
     //     UndefinedQtyArray[3] := SourceQuantityArray[3] - TotalItemTrackingLine."Qty. to Invoice (Base)";
     // end;
 
-    local procedure GetLastEntryNo(): integer
-    var
-        ReservationEntry: Record "Reservation Entry";
-    begin
-        ReservationEntry.Reset();
-        if ReservationEntry.FindLast() then
-            exit(ReservationEntry."Entry No." + 1);
-        exit(1);
-    end;
+
 
     // procedure ZeroLineExists(var TemptrackingSpecification: Record "Tracking Specification" temporary) OK: Boolean
     // var
@@ -3737,88 +3949,31 @@ codeunit 65001 "Blade Mgt."
     //     TemptrackingSpecification.Copy(xTrackingSpec);
     // end;
 
-    procedure TestTempSpecificationExists(var TempTrackinfSpecification: Record "Tracking Specification") Exists: Boolean
-    var
-        TrackingSpecification: Record "Tracking Specification";
-        CurrentPageIsOpen: Boolean;
-        Text011: Label 'Tracking specification with Serial No. %1 and Lot No. %2 and Package %3 already exists.', Comment = '%1 - serial no, %2 - lot no, %3 - package no.';
-        Text012: Label 'Tracking specification with Serial No. %1 already exists.';
-    begin
-        TrackingSpecification.Copy(TempTrackinfSpecification);
-        TempTrackinfSpecification.SetCurrentKey("Lot No.", "Serial No.");
-        TempTrackinfSpecification.SetRange("Serial No.", TempTrackinfSpecification."Serial No.");
-        if TempTrackinfSpecification."Serial No." = '' then
-            TempTrackinfSpecification.SetNonSerialTrackingFilterFromSpec(TempTrackinfSpecification);
-        TempTrackinfSpecification.SetFilter("Entry No.", '<>%1', TempTrackinfSpecification."Entry No.");
-        TempTrackinfSpecification.SetRange("Buffer Status", 0);
+    // procedure TestTempSpecificationExists(var TempTrackinfSpecification: Record "Tracking Specification") Exists: Boolean
+    // var
+    //     TrackingSpecification: Record "Tracking Specification";
+    //     CurrentPageIsOpen: Boolean;
+    //     Text011: Label 'Tracking specification with Serial No. %1 and Lot No. %2 and Package %3 already exists.', Comment = '%1 - serial no, %2 - lot no, %3 - package no.';
+    //     Text012: Label 'Tracking specification with Serial No. %1 already exists.';
+    // begin
+    //     TrackingSpecification.Copy(TempTrackinfSpecification);
+    //     TempTrackinfSpecification.SetCurrentKey("Lot No.", "Serial No.");
+    //     TempTrackinfSpecification.SetRange("Serial No.", TempTrackinfSpecification."Serial No.");
+    //     if TempTrackinfSpecification."Serial No." = '' then
+    //         TempTrackinfSpecification.SetNonSerialTrackingFilterFromSpec(TempTrackinfSpecification);
+    //     TempTrackinfSpecification.SetFilter("Entry No.", '<>%1', TempTrackinfSpecification."Entry No.");
+    //     TempTrackinfSpecification.SetRange("Buffer Status", 0);
 
-        //OnTestTempSpecificationExistsOnAfterSetFilters(Rec);
-        Exists := not TempTrackinfSpecification.IsEmpty();
-        TempTrackinfSpecification.Copy(TrackingSpecification);
-        if Exists and CurrentPageIsOpen then
-            if TempTrackinfSpecification."Serial No." = '' then
-                Message(Text011, TempTrackinfSpecification."Serial No.", TempTrackinfSpecification."Lot No.", TempTrackinfSpecification."Package No.")
-            else
-                Message(Text012, TempTrackinfSpecification."Serial No.");
-    end;
+    //     //OnTestTempSpecificationExistsOnAfterSetFilters(Rec);
+    //     Exists := not TempTrackinfSpecification.IsEmpty();
+    //     TempTrackinfSpecification.Copy(TrackingSpecification);
+    //     if Exists and CurrentPageIsOpen then
+    //         if TempTrackinfSpecification."Serial No." = '' then
+    //             Message(Text011, TempTrackinfSpecification."Serial No.", TempTrackinfSpecification."Lot No.", TempTrackinfSpecification."Package No.")
+    //         else
+    //             Message(Text012, TempTrackinfSpecification."Serial No.");
+    // end;
 
-    procedure InsertSerialNos(BladeSku: Text; var pSalesHeader: Record "Sales Header"; var pSalesLine: Record "Sales Line")
-    var
-        ReservationEntry: Record "Reservation Entry";
-        pageItemTrackingLine: Page "Item Tracking Lines";
-
-        CompanyInfo: Record "Company Information";
-    begin
-        CompanyInfo.get();
-        //TrackingSpecification.Reset();
-        //TrackingSpecification.SetRange(TrackingSpecification."Entry No.", 686);
-        //TrackingSpecification.SetFilter(TrackingSpecification."Source ID", '%1', 'WS000000006');
-        //if TrackingSpecification.FindFirst() then
-        //TrackingSpecification.Delete();
-        TrackingSpecification.Reset();
-        TrackingSpecification.init();
-        TrackingSpecification."Entry No." := GetLastEntryNo1();
-        TrackingSpecification.Validate("Serial No.", '5611002');
-        if pSalesHeader."Location Code" <> '' then
-            TrackingSpecification."Location Code" := pSalesHeader."Location Code"
-        //pWhseShipmentHeader."Location Code"
-        else
-            TrackingSpecification."Location Code" := CompanyInfo."Location Code";
-        TrackingSpecification."Item No." := pSalesLine."No.";
-        TrackingSpecification.validate("Quantity (Base)", -1);
-        TrackingSpecification."Source Type" := 37;
-        TrackingSpecification."Source Subtype" := 1;
-        TrackingSpecification."Source ID" := pSalesHeader."No.";
-        TrackingSpecification."Source Ref. No." := pSalesLine."Line No.";
-        TrackingSpecification.Positive := false;
-        TrackingSpecification."Qty. per Unit of Measure" := 1;
-        TrackingSpecification."Creation Date" := WorkDate();
-        TrackingSpecification.Insert(true);
-
-
-        // ReservationEntry.Init();
-        // ReservationEntry."Entry No." := GetLastEntryNo();
-        // ReservationEntry.Positive := false;
-        // ReservationEntry."Item No." := BladeSku;//change to our item
-        // ReservationEntry."Location Code" := pWhseShipmentHeader."Location Code";
-        // ReservationEntry."Quantity (Base)" := 1;
-        // ReservationEntry."Reservation Status" := ReservationEntry."Reservation Status"::Surplus;
-        // ReservationEntry."Source Subtype" := 1;
-        // ReservationEntry."Source Type" := 37;
-        // ReservationEntry."Source ID" := pWhseShipmentHeader."Sales Order No.";
-        // ReservationEntry."Source Ref. No." := pWhseShipmentLine."Source Line No.";
-        // ReservationEntry.Insert();
-    end;
-
-    local procedure GetLastEntryNo1(): integer
-    var
-        TrackingSepcification: Record "Tracking Specification";
-    begin
-        TrackingSepcification.Reset();
-        if TrackingSepcification.FindLast() then
-            exit(TrackingSepcification."Entry No." + 1);
-        exit(1);
-    end;
 
 
 
@@ -3897,7 +4052,7 @@ codeunit 65001 "Blade Mgt."
         if (Rec."Blade Status" <> Rec."Blade Status"::cancelled) and Rec."Sent to Blade" then Error(ReceiptHeaderDeleteErr, Rec."Blade Status");
     end;
 
-    [EventSubscriber(ObjectType::Table, Database::"Job Planning Line", 'OnAfterValidateEvent', 'Quantity', true, true)]
+    [EventSubscriber(ObjectType::Table, Database::"Job Planning Line", 'OnAfterValidateEvent', 'Quantity', false, false)]
     procedure ValidateQtyToSendToBlade(CurrFieldNo: Integer;
     var Rec: Record "Job Planning Line";
     var xRec: Record "Job Planning Line")
@@ -3914,6 +4069,17 @@ codeunit 65001 "Blade Mgt."
             if Rec."Usage Link" then Rec.Validate("Qty. to Send to Blade", Rec."Remaining Qty.");
             UpdateJobPlannningLineQty(Rec);
         end;
+    end;
+
+    [EventSubscriber(ObjectType::Table, Database::"Job Planning Line", 'OnAfterValidateEvent', 'No.', false, false)]
+    local procedure CheckIfSentToBlade(var Rec: Record "Job Planning Line"; var xRec: Record "Job Planning Line")
+    var
+        ChangeItemNoErr: Label 'You cannot change the Item, because the job planning line has already been sent to Blade.';
+    begin
+        if Rec.Type <> Rec.Type::Item then
+            exit;
+        if ((xRec."No." <> Rec."No.") or (Rec."No." = '')) and not (Rec."Blade Status" in [Rec."Blade Status"::Empty, Rec."Blade Status"::cancelled]) then
+            Error(ChangeItemNoErr);
     end;
 
     [EventSubscriber(ObjectType::Table, Database::"Job Planning Line", 'OnBeforeDeleteEvent', '', true, true)]

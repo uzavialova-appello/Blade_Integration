@@ -97,6 +97,26 @@ tableextension 65014 "Job Planning Line Blade" extends "Job Planning Line"
         {
             DataClassification = ToBeClassified;
         }
+        field(65025; "Return Status"; Enum "Return Status")
+        {
+            DataClassification = ToBeClassified;
+        }
+        field(65026; "Return Id"; Code[30])
+        {
+            DataClassification = ToBeClassified;
+        }
+        field(65027; "Return Reason"; Enum "Return Reason")
+        {
+            DataClassification = ToBeClassified;
+        }
+        modify(Quantity)
+        {
+            trigger OnBeforeValidate()
+            begin
+                CheckReturnReasonExists();
+            end;
+        }
+
 
     }
     keys
@@ -104,5 +124,18 @@ tableextension 65014 "Job Planning Line Blade" extends "Job Planning Line"
         key(Key15; "Blade ID", "Blade Status", "Sent to Blade", "Blade Reference")
         {
         }
+        key(Key16; "To Be Sent To Blade")
+        {
+
+        }
     }
+    procedure CheckReturnReasonExists()
+    begin
+        if Rec.Type <> Rec.Type::Item then
+            exit;
+        If (xRec.Quantity <> Rec.Quantity) and (Rec.Quantity < 0) then begin
+            If "Return Reason" = "Return Reason"::Empty then
+                Error('Select Return Reason before updating the quantity.');
+        end;
+    end;
 }
